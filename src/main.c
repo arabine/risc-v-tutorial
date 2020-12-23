@@ -1,44 +1,22 @@
-/*!
-    \file  main.c
-    \brief running led
-    
-    \version 2019-6-5, V1.0.0, firmware for GD32VF103
-*/
-
-/*
-    Copyright (c) 2019, GigaDevice Semiconductor Inc.
-
-    Redistribution and use in source and binary forms, with or without modification, 
-are permitted provided that the following conditions are met:
-
-    1. Redistributions of source code must retain the above copyright notice, this 
-       list of conditions and the following disclaimer.
-    2. Redistributions in binary form must reproduce the above copyright notice, 
-       this list of conditions and the following disclaimer in the documentation 
-       and/or other materials provided with the distribution.
-    3. Neither the name of the copyright holder nor the names of its contributors 
-       may be used to endorse or promote products derived from this software without 
-       specific prior written permission.
-
-    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
-IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
-NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, 
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY 
-OF SUCH DAMAGE.
-*/
-
 #include "gd32vf103.h"
 #include "systick.h"
 #include <stdio.h>
 #include <stdbool.h>
 #include <ff.h>
 #include "diskio.h"
+#include <string.h>
 
+// filename of wave file to play
+const char filename[] = "castemere_mono.wav";
+
+// SD_FAT_TYPE = 0 for SdFat/File as defined in SdFatConfig.h,
+// 1 for FAT16/FAT32, 2 for exFAT, 3 for FAT16/FAT32 and exFAT.
+#define SD_FAT_TYPE 2
+//
+// Set DISABLE_CHIP_SELECT to disable a second SPI device.
+// For example, with the Ethernet shield, set DISABLE_CHIP_SELECT
+// to 10 to disable the Ethernet controller.
+const int8_t DISABLE_CHIP_SELECT = -1;
 
 /* BUILTIN LED RED COLOR OF LONGAN BOARDS IS PIN PC13 */
 // #define LED_PIN GPIO_PIN_13
@@ -126,22 +104,27 @@ FRESULT scan_files (
 {
 	DIR dirs;
 	FRESULT fr;
-	int i;
 
 	fr = f_opendir(&dirs, path);
-	if (fr == FR_OK) {
+	if (fr == FR_OK)
+    {
 		while (((fr = f_readdir(&dirs, &Finfo)) == FR_OK) && Finfo.fname[0]) {
 			if (Finfo.fattrib & AM_DIR) {
 			
-				i = strlen(path);
+//				i = strlen(path);
                 printf("/%s\r\n", Finfo.fname);
-				//if (fr != FR_OK) break;
+				if (fr != FR_OK) break;
 			} else {
 //				xprintf(PSTR("%s/%s\n"), path, Finfo.fname);
 				printf("%s\r\n", Finfo.fname);
 			}
 		}
 	}
+    else
+    {
+        printf("[OST] Cannot open directory\r\n");
+    }
+    
 
 	return fr;
 }
@@ -182,6 +165,9 @@ static volatile uint32_t msTicks = 0;
 static volatile bool tick_1s = false;
 static volatile uint32_t tick_1s_counter = 0;
 
+static volatile bool tick_10ms = false;
+static volatile uint32_t tick_10ms_counter = 0;
+
 #define CONFIG_TICKS        (TIMER_FREQ / 1000)
 #define SysTick_Handler     eclic_mtip_handler
 
@@ -195,8 +181,18 @@ void SysTick_Handler(void)
         tick_1s_counter = 0;
         tick_1s = true;
     }
+
+    tick_10ms_counter++;
+    if (tick_10ms_counter >= 10)
+    {
+        tick_10ms_counter = 0;
+        tick_10ms = true;
+    }
+
     disk_timerproc();
 }
+
+static FATFS fs;
 
 /*!
     \brief      main function
@@ -222,34 +218,47 @@ int main(void)
     bool led_running = false;
 
   // Mount FAT
-    FATFS fs;
-    FRESULT fr = f_mount(&fs, "", 1); // 0: mount successful ; 1: mount failed
+    
+    uint32_t retries = 3;
+    FRESULT fr;
+    do 
+    {
+        fr = f_mount(&fs, "", 1); // 0: mount successful ; 1: mount failed
+        delay_1ms(10);
+    } while (--retries && fr);
 
-    if (fr) { // Mount Fail (Loop)
-        printf("[OST] No Card Found!\r\n", 1);
+    if (fr)
+    {
+        printf("[OST] No Card Found! Err=%d\r\n", (int)fr);
     }
 
     printf("[OST] SD Card File System = %d\r\n", fs.fs_type); // FS_EXFAT = 4
     printf("[OST] Starting with CPU=%d\r\n", (int)SystemCoreClock);
 
-/*
-    acc_size = acc_dirs = acc_files = 0;
-				strcpy((char*)Buff, ptr);
-				fr = scan_files((char*)Buff, &acc_dirs, &acc_files, &acc_size);
-*/
+
+    scan_files("");
+
+    printf("[OST] Starting loop\r\n");
+
     while(1)
     {
         if (tick_1s)
         {
             tick_1s = false;
-            printf("[OST] SysTick=%d\r\n", (int)msTicks);
+            //  printf("[OST] SysTick=%d\r\n", (int)msTicks);
+        }
 
+
+        if (tick_10ms)
+        {
+            tick_10ms = false;
+          
             if(SET ==  gpio_input_bit_get(GPIOB, GPIO_PIN_11))
             {
                 if (!bp1_is_on)
                 {
                     bp1_counter++;
-                    if (bp1_counter >= 50)
+                    if (bp1_counter >= 5)
                     {
                         bp1_counter = 0;
                         bp1_is_on = true;
@@ -262,7 +271,7 @@ int main(void)
                 if (bp1_is_on)
                 {
                     bp1_counter++;
-                    if (bp1_counter >= 50)
+                    if (bp1_counter >= 5)
                     {
                         bp1_counter = 0;
                         bp1_is_on = false;
@@ -282,7 +291,7 @@ int main(void)
             if (led_running)
             {
                 led_counter++;
-                if (led_counter >= 1000)
+                if (led_counter >= 100)
                 {
                     led_counter = 0;
                     if (led_is_on)

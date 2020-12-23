@@ -17,12 +17,12 @@
 
 void spi_set_fclk_slow()
 {
-    // FIXME
+    SPI_CTL0(SPI1) = (SPI_CTL0(SPI1) & ~0x38) | 0x38;
 }
 
 void spi_set_fclk_fast()
 {
-    // FIXME
+    SPI_CTL0(SPI1) = (SPI_CTL0(SPI1) & ~0x38) | 0x00;
 }
 
 void spi_cs_high()

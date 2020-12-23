@@ -17,9 +17,11 @@
 ---------------------------------------------------------------------------*/
 
 #include "spi.h"
+#include "ost_common.h"
+
 #include "ff.h"
 #include "diskio.h"
-#include "ost_common.h"
+
 
 /* macros used by sdcard.c, relation with SPI module */
 #define FCLK_SLOW() spi_set_fclk_slow()
@@ -213,6 +215,7 @@ DSTATUS disk_initialize (
 	if (send_cmd(CMD0, 0) == 1) {			/* Put the card SPI/Idle state */
 		Timer1 = 1000;						/* Initialization timeout = 1 sec */
 		if (send_cmd(CMD8, 0x1AA) == 1) {	/* SDv2? */
+
 			for (n = 0; n < 4; n++) ocr[n] = xchg_spi(0xFF);	/* Get 32 bit return value of R7 resp */
 			if (ocr[2] == 0x01 && ocr[3] == 0xAA) {				/* Is the card supports vcc of 2.7-3.6V? */
 				while (Timer1 && send_cmd(ACMD41, 1UL << 30)) ;	/* Wait for end of initialization with ACMD41(HCS) */
@@ -222,6 +225,7 @@ DSTATUS disk_initialize (
 				}
 			}
 		} else {	/* Not SDv2 card */
+
 			if (send_cmd(ACMD41, 0) <= 1) 	{	/* SDv1 or MMC? */
 				ty = CT_SDC1; cmd = ACMD41;	/* SDv1 (ACMD41(0)) */
 			} else {
@@ -232,6 +236,7 @@ DSTATUS disk_initialize (
 				ty = 0;
 		}
 	}
+	
 	CardType = ty;	/* Card type */
 	deselect();
 
