@@ -22,6 +22,8 @@ int32_t audio_buf[2][SIZE_OF_SAMPLES];
 // Audio Buffer for File Read
 int16_t buf_16b[SIZE_OF_SAMPLES];
 
+int32_t  DAC_ZERO_VALUE = 1;    // Non-zero value For prevending pop-noise when PCM5102A enters/exits Zero Data Detect
+
 volatile static int count = 0;
 
 FIL fil;
@@ -34,7 +36,7 @@ int pausing = 0;
 int finished = 0; // means the player has finished to play whole files in the folder (by not stop)
 uint32_t data_offset = 0;
 
-static int volume = 10; // 0 ~ 100;
+static int volume = 65; // 0 ~ 100;
 
 union U {
     uint32_t i;
@@ -216,19 +218,9 @@ static int get_audio_buf(FIL *tec, int32_t *buf_32b, int32_t *trans_number)
         }
     }
 
-    
-
-    for (i = 0; i < number/4; i++) {
-        
-
-        buf_32b[i*2+0] = (int32_t) swap16b((int32_t) buf_16b[i*2+0]); //* vol_table[volume]); // L
-        buf_32b[i*2+1] = (int32_t) swap16b((int32_t) buf_16b[i*2+1]);// * vol_table[volume]); // R
-
-        if ( buf_32b[i*2] > 65000)
-        {
-            printf("!\r\n");
-        }
-
+   for (i = 0; i < number/4; i++) {
+        buf_32b[i*2+0] = (int32_t) swap16b((int32_t) buf_16b[i*2+0] * vol_table[volume]) + DAC_ZERO_VALUE; // L
+        buf_32b[i*2+1] = (int32_t) swap16b((int32_t) buf_16b[i*2+1] * vol_table[volume]) + DAC_ZERO_VALUE; // R
         lvl_l += ((int32_t) buf_16b[i*2+0] * buf_16b[i*2+0]) / 32768;
         lvl_r += ((int32_t) buf_16b[i*2+1] * buf_16b[i*2+1]) / 32768;
     }
@@ -255,14 +247,14 @@ void audio_init(void)
     pausing = 0;
 
     for (int i = 0; i < SIZE_OF_SAMPLES; i++) {
-        audio_buf[0][i] = 0;
-        audio_buf[1][i] = 0;
+        audio_buf[0][i] = DAC_ZERO_VALUE;
+        audio_buf[1][i] = DAC_ZERO_VALUE;
     }
     dma_trans_number = SIZE_OF_SAMPLES*2;
 
     init_i2s2();
     spi_dma_enable(SPI2, SPI_DMA_TRANSMIT);
-    init_dma_i2s2(&audio_buf[0], dma_trans_number);
+    init_dma_i2s2(audio_buf[0], dma_trans_number);
     dma_channel_enable(DMA1, DMA_CH1);
     dma_interrupt_enable(DMA1, DMA_CH1, DMA_INT_FTF);
     eclic_irq_enable(DMA1_Channel1_IRQn, 15, 15); // level = 15, priority = 15 (MAX)
@@ -309,10 +301,6 @@ void audio_stop(void)
 
 void DMA1_Channel1_IRQHandler(void)
 {
-    dma_flag_clear(DMA1, DMA_CH1, DMA_FLAG_FTF);
-    dma_channel_disable(DMA1, DMA_CH1);
-    init_dma_i2s2(&audio_buf[0], dma_trans_number);
-
     int nxt1 = (count & 0x1) ^ 0x1;
     int nxt2 = 1 - nxt1;
     dma_flag_clear(DMA1, DMA_CH1, DMA_FLAG_FTF);
@@ -321,15 +309,13 @@ void DMA1_Channel1_IRQHandler(void)
         playing = 0;
         pausing = 0;
     }
-    init_dma_i2s2(&audio_buf[nxt1], dma_trans_number);
+    init_dma_i2s2(audio_buf[nxt1], dma_trans_number);
     dma_channel_enable(DMA1, DMA_CH1);
     if (playing && !pausing) {
-   
-        next_is_end = get_audio_buf(&fil, &audio_buf[nxt2], &dma_trans_number);
-   
+        next_is_end = get_audio_buf(&fil, audio_buf[nxt2], &dma_trans_number);
     } else {
         for (int i = 0; i < SIZE_OF_SAMPLES; i++) {
-            audio_buf[nxt2][i] = 0;
+            audio_buf[nxt2][i] = DAC_ZERO_VALUE;
         }
         dma_trans_number = SIZE_OF_SAMPLES*2;
     }

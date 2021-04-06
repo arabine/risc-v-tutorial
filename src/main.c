@@ -8,7 +8,7 @@
 #include <string.h>
 
 // filename of wave file to play
-const char filename[] = "bensound-ukulele.wav"; //castemere_mono.wav";
+const char filename[] = "out.wav"; //castemere_mono.wav";
 
 // SD_FAT_TYPE = 0 for SdFat/File as defined in SdFatConfig.h,
 // 1 for FAT16/FAT32, 2 for exFAT, 3 for FAT16/FAT32 and exFAT.
@@ -192,151 +192,6 @@ void SysTick_Handler(void)
 
     disk_timerproc();
 }
-#if 0
- #include <math.h>
- #include "i2s.h"
-#define SIZE_OF_SAMPLES 512  // samples for 2ch
-#define SAMPLE_RATE     (44100)
-#define WAVE_FREQ_HZ    (440)
-#define PI              (3.14159265)
-#define SAMPLE_PER_CYCLE (SAMPLE_RATE/WAVE_FREQ_HZ)
-#define DELTA 2.0*PI*WAVE_FREQ_HZ/SAMPLE_RATE
-
-uint32_t audio_buf0[SIZE_OF_SAMPLES];
-uint32_t audio_buf1[SIZE_OF_SAMPLES];
-
-static double ang = 0;
-static int count = 0;
-static double triangle_float = 0.0;
-
-union U {
-    uint32_t i;
-    uint16_t s[2];
-} u;
-
-// 16bit swap
-uint32_t swap16b(uint32_t in_val)
-{
-    u.i = in_val;
-    return ((uint32_t) u.s[0] << 16) | ((uint32_t) u.s[1]);
-}
-
-double _square_wave(void)
-{
-    double dval;
-    if (ang >= 2.0*PI) {
-        ang -= 2.0*PI;
-        triangle_float = -(double) pow(2, 22);
-    }
-    if (ang < PI) {
-        dval = 1.0;
-    } else {
-        dval = -1.0;
-    }
-    return dval;
-}
-
-// Generate Triangle Wave
-void setup_triangle_sine_waves(int32_t *samples_data)
-{
-    unsigned int i;
-    double square_float;
-    double triangle_step = (double) pow(2, 23) / SAMPLE_PER_CYCLE;
-
-    for(i = 0; i < SIZE_OF_SAMPLES/2; i++) {
-        square_float = _square_wave();
-        ang += DELTA;
-        if (square_float >= 0) {
-            triangle_float += triangle_step;
-        } else {
-            triangle_float -= triangle_step;
-        }
-
-        square_float *= (pow(2, 23) - 1);
-        samples_data[i*2+0] = swap16b((int) square_float * 256);
-        samples_data[i*2+1] = swap16b((int) triangle_float * 256);
-    }
-}
-
-#define SAMPLERATE_HZ 44100  // The sample rate of the audio.  Higher sample rates have better fidelity,
-                             // but these tones are so simple it won't make a difference.  44.1khz is
-                             // standard CD quality sound.
-
-#define AMPLITUDE     20   // Set the amplitude of generated waveforms.  This controls how loud
-                             // the signals are, and can be any value from 0 to 2**31 - 1.  Start with
-                             // a low value to prevent damaging speakers!
-/*
-#define SIZE_OF_SAMPLES      256    // The size of each generated waveform.  The larger the size the higher
-                             // quality the signal.  A size of 256 is more than enough for these simple
-                             // waveforms.
-
-*/
-// Define the frequency of music notes (from http://www.phy.mtu.edu/~suits/notefreqs.html):
-#define C4_HZ      261.63
-#define D4_HZ      293.66
-#define E4_HZ      329.63
-#define F4_HZ      349.23
-#define G4_HZ      392.00
-#define A4_HZ      440.00
-#define B4_HZ      493.88
-
-// Define a C-major scale to play all the notes up and down.
-float scale[] = { C4_HZ, D4_HZ, E4_HZ, F4_HZ, G4_HZ, A4_HZ, B4_HZ, A4_HZ, G4_HZ, F4_HZ, E4_HZ, D4_HZ, C4_HZ };
-
-// Store basic waveforms in memory.
-int16_t sine[SIZE_OF_SAMPLES / 2]     = {0};
-
-
-void generateSine(int32_t amplitude, int16_t* buffer, uint16_t length) {
-  // Generate a sine wave signal with the provided amplitude and store it in
-  // the provided buffer of size length.
-  for (int i=0; i<length; ++i) {
-    buffer[i] = (int16_t)(((float)amplitude)*sin(2.0*PI*(1.0/length)*i));
-  }
-}
-
-void prepare_audio_buf(void)
-{
-//    generateSine(100, sine, SIZE_OF_SAMPLES / 2);
- //   setup_triangle_sine_waves(audio_buf0);
- //   setup_triangle_sine_waves(audio_buf1);
-    // for(unsigned int i = 0; i < SIZE_OF_SAMPLES/2; i++)
-    // {
-    //     audio_buf0[i*2+0] = sine[i];
-    //     audio_buf0[i*2+1] = sine[i];
-    // }
-
-
-    setup_triangle_sine_waves(audio_buf0);
-    setup_triangle_sine_waves(audio_buf1);
-
-    init_i2s2();
-    init_dma_i2s2(audio_buf0, SIZE_OF_SAMPLES*2);
-
-    spi_dma_enable(SPI2, SPI_DMA_TRANSMIT);
-    dma_channel_enable(DMA1, DMA_CH1);
-    count = 0;
-}
-
-void run_audio_buf(void)
-{
-    if (SET == dma_flag_get(DMA1, DMA_CH1, DMA_FLAG_FTF)) {
-        dma_flag_clear(DMA1, DMA_CH1, DMA_FLAG_FTF);
-        dma_channel_disable(DMA1, DMA_CH1);
-        if (count % 2 == 0) {
-            init_dma_i2s2(audio_buf1, SIZE_OF_SAMPLES*2);
-        } else {
-            init_dma_i2s2(audio_buf0, SIZE_OF_SAMPLES*2);
-        }
-        dma_channel_enable(DMA1, DMA_CH1);
-
-        // 次のaudio_bufの準備をここで行う
-
-        count++;
-        
-    }
-}
-#endif
 
 static FATFS fs;
 
@@ -386,7 +241,13 @@ int main(void)
 
     printf("[OST] Starting loop\r\n");
 
-   audio_init();
+
+  // DAC MCLK out from CK_OUT0 (PA8)
+    // gpio_init(GPIOA, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_8);
+    // rcu_ckout0_config(RCU_CKOUT0SRC_CKPLL2_DIV2);
+
+    audio_init();
+
     audio_play(filename);
 
   // prepare_audio_buf();
@@ -394,7 +255,8 @@ int main(void)
     while(1)
     {
     //    run_audio_buf();
-
+    }
+    /*
 
         if (tick_1s)
         {
@@ -467,4 +329,5 @@ int main(void)
         
         
     }
+    */
 }
