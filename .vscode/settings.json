@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "spi0.h": "c",
+        "gd32vf103.h": "c"
+    }
+}
