@@ -195,9 +195,9 @@ void SysTick_Handler(void)
 }
 
 static uint8_t bmpImage[512];
-static uint8_t palette[16*4];
+
 static uint8_t decompressed[1024];
-static uint8_t dummy[320];
+static uint8_t palette[16*4];
 
 typedef struct {
    uint16_t type;                 /* Magic identifier            */
@@ -267,6 +267,8 @@ void decompress()
     f_lseek(&fil, offset);
     f_read(&fil, bmpImage, 512, &br);
 
+    int nblines=0;
+
     bmp_header_t header;
     bmp_infoheader_t info_header;
     parse_bmp(bmpImage, &header, &info_header);
@@ -283,7 +285,7 @@ void decompress()
     offset = header.offset;
     uint8_t *compressed = &bmpImage[header.offset];
 
-
+/*
     printf("File size (from header):%d\r\n", (uint32_t)header.size);
     printf("File size (from data):%d\r\n", (uint32_t)fileSize);
     printf("Data offset:%d\r\n", (uint32_t)header.offset);
@@ -300,7 +302,7 @@ void decompress()
     printf("Important colors:%d\r\n", (uint32_t)info_header.importantcolours);
     printf("RGB :%d\r\n", (uint32_t)info_header.rgb);
     printf("RGB2 :%d\r\n", (uint32_t)info_header.rgb2);
-
+*/
     // buffer de sortie, bitmap décompressé
     memset(decompressed, 0, sizeof(decompressed));
 
@@ -342,6 +344,19 @@ void decompress()
                     decompressed[pixel] = (val & 0x0F);
                 }
                 pixel++;
+
+                if (pixel > info_header.width)
+                {
+                    // // enough pixels to write a line to the screen
+                    // ili9341_draw_h_line(pos.y, decompressed, palette);
+                    // // ili9341_write(&pos, decompressed);
+                    // // next line...
+                    // pos.y++;
+                    // totalPixels += info_header.width;
+                //    pixel = 0;
+               //     nblines++;
+               printf("!");
+                }
             }
             i += 2; // jump pair instruction
         }
@@ -357,16 +372,6 @@ void decompress()
                     uint32_t remaining = info_header.width - (pixel - (lines * info_header.width));
 
                     pixel += remaining;
-                }
-                else
-                {
-                    // enough pixels to write a line to the screen
-                    ili9341_draw_h_line(pos.y, decompressed, palette);
-                    // ili9341_write(&pos, decompressed);
-                    // next line...
-                    pos.y++;
-                    totalPixels += info_header.width;
-                    pixel = 0;
                 }
                 i += 2;
             }
@@ -397,6 +402,12 @@ void decompress()
                         ptr++;
                     }
                     pixel++;
+
+                    if (pixel >= info_header.width)
+                    {
+                        printf("!");
+                      //  pixel = 0;
+                    }
                 }
                 i += 2 + (second / 2);
 
@@ -406,18 +417,26 @@ void decompress()
                     i++;
                 }
             }
+
+            if (pixel == info_header.width)
+            {
+                // enough pixels to write a line to the screen
+                ili9341_draw_h_line(pos.y, decompressed, palette);
+                // ili9341_write(&pos, decompressed);
+                // next line...
+                pos.y++;
+                totalPixels += info_header.width;
+                pixel = 0;
+                nblines++;
+            }
         }
-/*
-        if (pixel >= info_header.width)
-        {
-            // enough pixels to write a line to the screen
-            ili9341_write(&pos, decompressed);
-            // next line...
-            pos.y++;
-            totalPixels += info_header.width;
-            pixel -= info_header.width;
-        }
-        */
+
+        
+        // else if (pixel > info_header.width)
+        // {
+        //     printf("!");
+        //     //  pixel = 0;
+        // }
 
         if (totalPixels > (info_header.width * info_header.height))
         {
@@ -427,6 +446,8 @@ void decompress()
     while((offset < fileSize) && !end);
 
     f_close(&fil);
+
+    printf("\r\nNb lines :%d\r\nTotal pixels: %d", (uint32_t)nblines, (uint32_t)totalPixels);
 }
 
 
@@ -498,6 +519,7 @@ int main(void)
     // rcu_ckout0_config(RCU_CKOUT0SRC_CKPLL2_DIV2);
 
     decompress();
+    // ili9341_fill();
 
     audio_init();
 

@@ -26,7 +26,6 @@ uint8_t ili9341_read_id(void);
 void ili9341_shutdown();
 void ili9341_set_rotation(uint8_t m);
 void ili9341_draw_h_line(uint16_t y, const uint8_t *data, const uint8_t *palette);
-void ili9341_write(const rect_t *pos, unsigned char *writeBuffer);
 
 #endif
 

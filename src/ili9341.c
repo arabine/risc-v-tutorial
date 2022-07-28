@@ -190,21 +190,6 @@ uint8_t ili9341_read_id(void)
     return success;
 }
 
-
-void ili9341_set_col(uint16_t StartCol,uint16_t EndCol)
-{
-    LCD_Write_COM(0x2A);                                                      /* Column Command address       */
-    LCD_Write_DATA(StartCol);
-    LCD_Write_DATA(EndCol);
-}
-
-void ili9341_set_page(uint16_t StartPage,uint16_t EndPage)
-{
-    LCD_Write_COM(0x2B);                                                      /* Column Command address       */
-    LCD_Write_DATA(StartPage);
-    LCD_Write_DATA(EndPage);
-}
-
 void ili9341_initialize()
 {
 	LCD_Write_COM(ILI9341_SWRESET);
@@ -360,25 +345,78 @@ uint8_t color_get_low(const color_t *c) {
 	return ((c->g & 28) << 3 | (c->b >> 3));
 }
 
+uint16_t color565(uint8_t r, uint8_t g, uint8_t b) {
+  return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
+
 void ili9341_draw_h_line(uint16_t y, const uint8_t *data, const uint8_t *palette)
 {
 	ili9341_adressSet(0, y, 320, 240);
-    dc_high();
-	spi0_cs_low();	
+  dc_high();
+  spi0_cs_low();	
 
-	color_t color;
-	
-    for(uint16_t i = 0; i < 320; i++)
-    {
-		uint8_t val = data[i];
+  color_t color;
+
+  for(uint16_t i = 0; i < 320; i++)
+  {
+      uint8_t val = data[i];
+
+      if (val > 15)
+      {
+        val = 0;
+        printf("***");
+      }
+
         uint8_t *palettePtr = &palette[val * 4];
-		color.r = palettePtr[0];
-		color.g = palettePtr[1];
-		color.b = palettePtr[2];
+        color.r = palettePtr[0];
+        color.g = palettePtr[1];
+        color.b = palettePtr[2];
+        uint16_t pixel = color565(color.r, color.g, color.b);
+
         xchg_spi0(color_get_high(&color));
         xchg_spi0(color_get_low(&color));
+		
+		// pixel = ILI9341_PURPLE;
+		// xchg_spi0(pixel>>8);
+		// xchg_spi0(pixel&0xFF);
     }
 
     spi0_cs_high();
+}
+
+void ili9341_fill()
+{
+  uint16_t pixel = ILI9341_PURPLE;
+  uint16_t pixel2 = ILI9341_YELLOW;
+  int line = 0;
+
+  for (uint16_t j = 0; j < 240; j++)
+  {
+    ili9341_adressSet(0, j, 320, 240);
+    dc_high();
+    spi0_cs_low();
+    uint8_t hi = pixel>>8;
+    uint8_t lo = pixel;
+
+    if (line == 0)
+    {
+      line = 1;
+    }
+    else
+    {
+      line = 0;
+      hi = pixel2>>8;
+      lo = pixel2;
+    }
+
+    for(uint16_t i = 0; i < 320; i++)
+    {
+        xchg_spi0(hi);
+        xchg_spi0(lo);
+    }
+
+    spi0_cs_high();
+  }
+
 }
 
