@@ -5,3 +5,5 @@
 .vscode/ipch
 
 *.log
+
+jlink.jdebug.user

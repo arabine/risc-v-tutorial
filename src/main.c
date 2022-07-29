@@ -422,6 +422,7 @@ void decompress()
             {
                 // enough pixels to write a line to the screen
                 ili9341_draw_h_line(pos.y, decompressed, palette);
+                memset(decompressed, 0, sizeof(decompressed));
                 // ili9341_write(&pos, decompressed);
                 // next line...
                 pos.y++;
@@ -517,13 +518,13 @@ int main(void)
   // DAC MCLK out from CK_OUT0 (PA8)
     // gpio_init(GPIOA, GPIO_MODE_AF_PP, GPIO_OSPEED_50MHZ, GPIO_PIN_8);
     // rcu_ckout0_config(RCU_CKOUT0SRC_CKPLL2_DIV2);
-
+    ili9341_fill();
     decompress();
     // ili9341_fill();
 
-    audio_init();
+  //  audio_init();
 
-    audio_play(filename);
+ //   audio_play(filename);
 
   // prepare_audio_buf();
 
