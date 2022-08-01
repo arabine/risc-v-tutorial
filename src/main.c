@@ -194,7 +194,7 @@ void SysTick_Handler(void)
     disk_timerproc();
 }
 
-static uint8_t bmpImage[512];
+static uint8_t bmpImage[1024];
 
 static uint8_t decompressed[1024];
 static uint8_t palette[16*4];
@@ -252,6 +252,8 @@ uint8_t parse_bmp(const uint8_t *data, bmp_header_t *header, bmp_infoheader_t *i
     return isBmp;
 }
 
+volatile int dbg = 0;
+
 void decompress()
 {
     FIL fil;
@@ -282,8 +284,11 @@ void decompress()
     offset = HEADER_SIZE + INFO_HEADER_SIZE;
     memcpy(palette, bmpImage + HEADER_SIZE + INFO_HEADER_SIZE, paletteSize);
 
-    offset = header.offset;
-    uint8_t *compressed = &bmpImage[header.offset];
+    offset = 0;
+    f_lseek(&fil, header.offset);
+    f_read(&fil, bmpImage, 512, &br);
+
+    uint8_t *compressed = &bmpImage[0];
 
 /*
     printf("File size (from header):%d\r\n", (uint32_t)header.size);
@@ -323,7 +328,20 @@ void decompress()
         if (i > 256)
         {
             offset = offset + i;
-            f_lseek(&fil, offset);
+
+            
+            volatile FRESULT res = f_lseek(&fil, offset);
+
+            if (res != FR_OK)
+            {
+                i = 0;
+            }
+
+            if (nblines == 154)
+            {
+                dbg++;
+            }
+
             f_read(&fil, bmpImage, 512, &br);
             i = 0;
         }

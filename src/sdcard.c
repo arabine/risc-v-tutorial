@@ -286,7 +286,9 @@ DRESULT disk_read (
 
 	if (!(CardType & CT_BLOCK)) sect *= 512;	/* LBA ot BA conversion (byte addressing cards) */
 
-	if (count == 1) {	/* Single sector read */
+	/* Single sector read */
+	if (count == 1)
+	{	
 		if ((send_cmd(CMD17, sect) == 0)	/* READ_SINGLE_BLOCK */
 			&& rcvr_datablock(buff, 512)) {
 			count = 0;

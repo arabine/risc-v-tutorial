@@ -89,9 +89,8 @@ void rcvr_spi_multi (
 	uint32_t btr		/* Number of bytes to receive (even number) */
 )
 {
-	do
-	{
-		*buff = xchg_spi(0xff);
-		buff++;
-	} while (btr--);
+    for (uint32_t i = 0; i < btr; i++)
+    {
+        buff[i] = xchg_spi(0xff);
+    }
 }
